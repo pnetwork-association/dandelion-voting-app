@@ -260,7 +260,7 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp,
     }
 
     /**
-     * @notice Vote for an third party if the provided signature is valid
+     * @notice Vote for a third party if the provided signature is valid
      * @param _applicant address for which the vote will be done
      * @param _voteId vote id
      * @param _supports support to the vote
@@ -290,7 +290,7 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp,
     }
 
     /**
-     * @notice Check if it's possible to vote for an third party if the provided signature is valid
+     * @notice Check if it's possible to vote for a third party if the provided signature is valid
      *          _applicant must provide (offchain) a signature in which is specified that _voter can vote for him
      * @param _applicant address for which the vote will be done
      * @param _voter address that performs the vote
