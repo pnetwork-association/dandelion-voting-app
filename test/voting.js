@@ -4,6 +4,7 @@ const { getEventAt, getEventArgument, getNewProxyAddress } = require('@aragon/co
 const getBlockNumber = require('@aragon/contract-test-helpers/blockNumber')(web3)
 const { encodeCallScript } = require('@aragon/contract-test-helpers/evmScript')
 const { makeErrorMappingProxy } = require('@aragon/contract-test-helpers/utils')
+const { enableVotingFor } = require('./sign')
 
 const ExecutionTarget = artifacts.require('ExecutionTarget')
 const Voting = artifacts.require('VotingMock')
@@ -57,7 +58,8 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
     DANDELION_VOTING_CAN_NOT_FORWARD: 'DANDELION_VOTING_CAN_NOT_FORWARD',
     DANDELION_VOTING_ORACLE_SENDER_MISSING: 'DANDELION_VOTING_ORACLE_SENDER_MISSING',
     DANDELION_VOTING_ORACLE_SENDER_TOO_BIG: 'DANDELION_VOTING_ORACLE_SENDER_TOO_BIG',
-    DANDELION_VOTING_ORACLE_SENDER_ZERO: 'DANDELION_VOTING_ORACLE_SENDER_ZERO'
+    DANDELION_VOTING_ORACLE_SENDER_ZERO: 'DANDELION_VOTING_ORACLE_SENDER_ZERO',
+    DANDELION_VOTING_ERROR_INVALID_SIGNATURE: 'DANDELION_VOTING_ERROR_INVALID_SIGNATURE'
   })
 
   const durationBlocks = 500
@@ -624,6 +626,52 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
           itChecksNoRecentPositiveVotesCorrectly(
             async (sender) => await voting.onTransfer.call(sender, ANY_ADDR, bigExp(1, 18)))
         })
+      })
+      it('should be able to vote for a third party', async () => {
+        const action = { to: executionTarget.address, calldata: executionTarget.contract.methods.execute().encodeABI() }
+        const script = encodeCallScript([action])
+        const voteId = createdVoteId(await voting.newVote(script, '', true, { from: root }))
+        
+        // holder1 enables holder2 to vote for him
+        const signature = await enableVotingFor(holder29, holder1, voteId, true, voting.address)
+        await voting.voteFor(holder29, voteId, true, signature, {
+          from: holder1
+        })
+
+        await voting.mockAdvanceBlocks(durationBlocks + executionDelayBlocks)
+        await voting.executeVote(voteId)
+      })
+
+      it('should not be able to vote 2 times for a third party', async () => {
+        const action = { to: executionTarget.address, calldata: executionTarget.contract.methods.execute().encodeABI() }
+        const script = encodeCallScript([action])
+        const voteId = createdVoteId(await voting.newVote(script, '', { from: root }))
+        
+        const signature = await enableVotingFor(holder29, holder1, voteId, true, voting.address)
+        await voting.voteFor(holder29, voteId, true, signature, {
+          from: holder1
+        })
+
+        await assertRevert(
+          voting.voteFor(holder29, voteId, true, signature, {
+            from: holder1
+          }),
+          errors.DANDELION_VOTING_CAN_NOT_VOTE
+        )
+      })
+
+      it('should not be able to vote for a third party because of an invalid signature', async () => {
+        const action = { to: executionTarget.address, calldata: executionTarget.contract.methods.execute().encodeABI() }
+        const script = encodeCallScript([action])
+        const voteId = createdVoteId(await voting.newVote(script, '', true, { from: root }))
+        
+        const signature = await enableVotingFor(holder29, holder1, voteId, true, voting.address)
+        await assertRevert(
+          voting.voteFor(holder51, voteId, true, signature, {
+            from: holder1
+          }),
+          errors.DANDELION_VOTING_ERROR_INVALID_SIGNATURE
+        )
       })
     })
   }
