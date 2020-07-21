@@ -1,6 +1,6 @@
 {
   "path": "contracts/DandelionVoting.sol",
-  "appName": "pnetwork-voting-app.aragonpm.eth",
+  "appName": "pnetwork-voting.aragonpm.eth",
   "environments": {
     "default": {
       "network": "rpc",
@@ -13,7 +13,7 @@
     "rinkeby": {
       "registry": "0x98df287b6c145399aaa709692c8d308357bc085d",
       "wsRPC": "wss://rinkeby.eth.aragon.network/ws",
-      "appName": "pnetwork-voting-app.open.aragonpm.eth",
+      "appName": "pnetwork-voting.open.aragonpm.eth",
       "network": "rinkeby"
     },
     "ropsten": {
@@ -22,7 +22,7 @@
     },
     "mainnet": {
       "registry": "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
-      "appName": "pnetwork-voting-app.open.aragonpm.eth",
+      "appName": "pnetwork-voting.open.aragonpm.eth",
       "network": "mainnet"
     }
   },
