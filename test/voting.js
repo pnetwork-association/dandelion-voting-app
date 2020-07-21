@@ -58,8 +58,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
     DANDELION_VOTING_CAN_NOT_FORWARD: 'DANDELION_VOTING_CAN_NOT_FORWARD',
     DANDELION_VOTING_ORACLE_SENDER_MISSING: 'DANDELION_VOTING_ORACLE_SENDER_MISSING',
     DANDELION_VOTING_ORACLE_SENDER_TOO_BIG: 'DANDELION_VOTING_ORACLE_SENDER_TOO_BIG',
-    DANDELION_VOTING_ORACLE_SENDER_ZERO: 'DANDELION_VOTING_ORACLE_SENDER_ZERO',
-    DANDELION_VOTING_ERROR_INVALID_SIGNATURE: 'DANDELION_VOTING_ERROR_INVALID_SIGNATURE'
+    DANDELION_VOTING_ORACLE_SENDER_ZERO: 'DANDELION_VOTING_ORACLE_SENDER_ZERO'
   })
 
   const durationBlocks = 500
@@ -634,7 +633,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         
         // holder1 enables holder2 to vote for him
         const signature = await enableVotingFor(holder29, holder1, voteId, true, voting.address)
-        await voting.voteFor(holder29, voteId, true, signature, {
+        await voting.voteFor(voteId, true, signature, {
           from: holder1
         })
 
@@ -648,12 +647,12 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         const voteId = createdVoteId(await voting.newVote(script, '', { from: root }))
         
         const signature = await enableVotingFor(holder29, holder1, voteId, true, voting.address)
-        await voting.voteFor(holder29, voteId, true, signature, {
+        await voting.voteFor(voteId, true, signature, {
           from: holder1
         })
 
         await assertRevert(
-          voting.voteFor(holder29, voteId, true, signature, {
+          voting.voteFor(voteId, true, signature, {
             from: holder1
           }),
           errors.DANDELION_VOTING_CAN_NOT_VOTE
@@ -665,12 +664,12 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         const script = encodeCallScript([action])
         const voteId = createdVoteId(await voting.newVote(script, '', true, { from: root }))
         
-        const signature = await enableVotingFor(holder29, holder1, voteId, true, voting.address)
+        const signature = await enableVotingFor(holder29, holder1, voteId + 1, true, voting.address)
         await assertRevert(
-          voting.voteFor(holder51, voteId, true, signature, {
+          voting.voteFor(voteId, true, signature, {
             from: holder1
           }),
-          errors.DANDELION_VOTING_ERROR_INVALID_SIGNATURE
+          errors.DANDELION_VOTING_CAN_NOT_VOTE
         )
       })
     })

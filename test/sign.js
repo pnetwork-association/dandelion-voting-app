@@ -7,7 +7,7 @@ const enableVotingFor = (
 ) =>
   new Promise((_resolve, _reject) => {
     const hash = web3.utils.soliditySha3(
-      _applicant, _voter, _voteId, _support, _contractAddress
+      _voter, _voteId, _support, _contractAddress
     ).toString('hex')
     
     // _applicant enables _voter to vote for him

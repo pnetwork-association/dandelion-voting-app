@@ -42,7 +42,6 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp,
     string private constant ERROR_ORACLE_SENDER_MISSING = "DANDELION_VOTING_ORACLE_SENDER_MISSING";
     string private constant ERROR_ORACLE_SENDER_TOO_BIG = "DANDELION_VOTING_ORACLE_SENDER_TOO_BIG";
     string private constant ERROR_ORACLE_SENDER_ZERO = "DANDELION_VOTING_ORACLE_SENDER_ZERO";
-    string private constant ERROR_INVALID_SIGNATURE = "DANDELION_VOTING_ERROR_INVALID_SIGNATURE";
 
     enum VoterState { Absent, Yea, Nay }
 
@@ -260,66 +259,29 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp,
     }
 
     /**
-     * @notice Vote for a third party if the provided signature is valid
-     * @param _applicant address for which the vote will be done
+     * @notice Vote for a third party (address from sig) if the provided signature is valid
      * @param _voteId vote id
      * @param _supports support to the vote
      * @param _sig signature
      */
     function voteFor(
-        address _applicant,
         uint256 _voteId,
         bool _supports,
         bytes _sig
     )
         external 
     {
-        require(_canVote(_voteId, _applicant), ERROR_CAN_NOT_VOTE);
-        require(
-            canVoteFor(
-                _applicant,
-                msg.sender,
-                _voteId,
-                _supports,
-                _sig
-            ),
-            ERROR_INVALID_SIGNATURE
-        );
-
-        _vote(_voteId, _supports, _applicant);
-    }
-
-    /**
-     * @notice Check if it's possible to vote for a third party if the provided signature is valid
-     *          _applicant must provide (offchain) a signature in which is specified that _voter can vote for him
-     * @param _applicant address for which the vote will be done
-     * @param _voter address that performs the vote
-    * @param _voteId vote id
-     * @param _supports support to the vote
-     * @param _sig signature
-     */
-    function canVoteFor(
-        address _applicant,
-        address _voter,
-        uint256 _voteId,
-        bool _supports,
-        bytes _sig
-    ) 
-        public
-        view
-        returns (bool)
-    {
         bytes32 message = prefixed(
             keccak256(
-                _applicant,
-                _voter,
+                msg.sender,
                 _voteId,
                 _supports,
                 this
             )
         );
-
-        return recoverSigner(message, _sig) == _applicant;
+        address applicant = recoverSigner(message, _sig);
+        require(_canVote(_voteId, applicant), ERROR_CAN_NOT_VOTE);
+        _vote(_voteId, _supports, applicant);
     }
 
     // Token Manager Hook fns
