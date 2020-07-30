@@ -29,7 +29,8 @@
   "dependencies": {
     "@1hive/apps-token-manager": "2.1.0",
     "@aragon/minime": "1.0.0",
-    "@aragon/os": "4.4.0"
+    "@aragon/os": "4.4.0",
+    "dotenv": "^8.2.0"
   },
   "devDependencies": {
     "@aragon/buidler-aragon": "^0.2.7",
