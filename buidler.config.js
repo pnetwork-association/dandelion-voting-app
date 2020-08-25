@@ -48,6 +48,11 @@ module.exports = {
   gasReporter: {
     enabled: process.env.GAS_REPORTER ? true : false,
   },
+  // Etherscan plugin configuration. Learn more at https://github.com/nomiclabs/buidler/tree/master/packages/buidler-etherscan
+  etherscan: {
+    apiKey: `${getEnvironmentVariable('ETHERSCAN_API_KEY')}`, // API Key for smart contract verification. Get yours at https://etherscan.io/apis,
+    url: 'https://api.etherscan.io/api'
+  },
   aragon: {
     appServePort: 3001,
     clientServePort: 3000,
