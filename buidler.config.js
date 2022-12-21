@@ -34,8 +34,9 @@ module.exports = {
     },
     mainnet: {
       url: `https://mainnet.infura.io/v3/${getEnvironmentVariable('INFURA_KEY')}`,
+      // url: 'http://localhost:8545',
       accounts: [getEnvironmentVariable('MAINNET_PRIVATE_KEY')],
-      gasPrice: 45e9
+      gasPrice: 15e9
     }
   },
   solc: {

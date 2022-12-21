@@ -51,6 +51,11 @@
       "name": "Modify execution delay blocks",
       "id": "MODIFY_EXECUTION_DELAY_ROLE",
       "params": []
+    },
+    {
+      "name": "Modify minimum amount to open a vote",
+      "id": "MODIFY_MIN_OPEN_VOTE_AMOUNT_ROLE",
+      "params": []
     }
   ]
 }

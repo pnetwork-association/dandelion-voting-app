@@ -24,6 +24,7 @@ const createdVoteId = receipt => getEventArgument(receipt, 'StartVote', 'voteId'
 const ANY_ADDR = '0xffffffffffffffffffffffffffffffffffffffff'
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 const EMPTY_SCRIPT = '0x00000001'
+const MIN_OPEN_VOTE_AMOUNT = 200000
 
 const VOTER_STATE = ['ABSENT', 'YEA', 'NAY'].reduce((state, key, index) => {
   state[key] = index
@@ -31,11 +32,11 @@ const VOTER_STATE = ['ABSENT', 'YEA', 'NAY'].reduce((state, key, index) => {
 }, {})
 
 
-contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, nonHolder]) => {
-  let votingBase, daoFact, voting, token, executionTarget
+contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, holder60]) => {
+  let votingBase, daoFact, voting, token, executionTarget, acl
 
   let APP_MANAGER_ROLE
-  let CREATE_VOTES_ROLE, MODIFY_SUPPORT_ROLE, MODIFY_QUORUM_ROLE, MODIFY_BUFFER_BLOCKS_ROLE, MODIFY_EXECUTION_DELAY_ROLE
+  let CREATE_VOTES_ROLE, MODIFY_SUPPORT_ROLE, MODIFY_QUORUM_ROLE, MODIFY_BUFFER_BLOCKS_ROLE, MODIFY_EXECUTION_DELAY_ROLE, MODIFY_MIN_OPEN_VOTE_AMOUNT_ROLE
 
   // Error strings
   const errors = makeErrorMappingProxy({
@@ -58,7 +59,8 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
     DANDELION_VOTING_CAN_NOT_FORWARD: 'DANDELION_VOTING_CAN_NOT_FORWARD',
     DANDELION_VOTING_ORACLE_SENDER_MISSING: 'DANDELION_VOTING_ORACLE_SENDER_MISSING',
     DANDELION_VOTING_ORACLE_SENDER_TOO_BIG: 'DANDELION_VOTING_ORACLE_SENDER_TOO_BIG',
-    DANDELION_VOTING_ORACLE_SENDER_ZERO: 'DANDELION_VOTING_ORACLE_SENDER_ZERO'
+    DANDELION_VOTING_ORACLE_SENDER_ZERO: 'DANDELION_VOTING_ORACLE_SENDER_ZERO',
+    DANDELION_VOTING_CAN_NOT_OPEN_VOTE: 'DANDELION_VOTING_CAN_NOT_OPEN_VOTE'
   })
 
   const durationBlocks = 500
@@ -80,19 +82,26 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
     MODIFY_QUORUM_ROLE = await votingBase.MODIFY_QUORUM_ROLE()
     MODIFY_BUFFER_BLOCKS_ROLE = await votingBase.MODIFY_BUFFER_BLOCKS_ROLE()
     MODIFY_EXECUTION_DELAY_ROLE = await votingBase.MODIFY_EXECUTION_DELAY_ROLE()
+    MODIFY_MIN_OPEN_VOTE_AMOUNT_ROLE = await votingBase.MODIFY_MIN_OPEN_VOTE_AMOUNT_ROLE()
   })
 
   beforeEach(async () => {
     const r = await daoFact.newDAO(root)
     const dao = await Kernel.at(getEventArgument(r, 'DeployDAO', 'dao'))
-    const acl = await ACL.at(await dao.acl())
+    acl = await ACL.at(await dao.acl())
 
     await acl.createPermission(root, dao.address, APP_MANAGER_ROLE, root, { from: root })
 
     const receipt = await dao.newAppInstance('0x1234', votingBase.address, '0x', false, { from: root })
     voting = await Voting.at(getNewProxyAddress(receipt))
 
-    await acl.createPermission(ANY_ADDR, voting.address, CREATE_VOTES_ROLE, root, { from: root })
+    await acl.createPermission(root, voting.address, MODIFY_MIN_OPEN_VOTE_AMOUNT_ROLE, root, { from: root })
+    await acl.createPermission(root, voting.address, CREATE_VOTES_ROLE, root, { from: root })
+    await acl.grantPermission(holder1, voting.address, CREATE_VOTES_ROLE, { from: root })
+    await acl.grantPermission(holder2, voting.address, CREATE_VOTES_ROLE, { from: root })
+    await acl.grantPermission(holder20, voting.address, CREATE_VOTES_ROLE, { from: root })
+    await acl.grantPermission(holder29, voting.address, CREATE_VOTES_ROLE, { from: root })
+    await acl.grantPermission(holder51, voting.address, CREATE_VOTES_ROLE, { from: root })
     await acl.createPermission(ANY_ADDR, voting.address, MODIFY_SUPPORT_ROLE, root, { from: root })
     await acl.createPermission(ANY_ADDR, voting.address, MODIFY_QUORUM_ROLE, root, { from: root })
     await acl.createPermission(ANY_ADDR, voting.address, MODIFY_BUFFER_BLOCKS_ROLE, root, { from: root })
@@ -107,6 +116,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
       token = await MiniMeToken.new(ZERO_ADDRESS, ZERO_ADDRESS, 0, 'n', 0, 'n', true) // empty parameters minime
 
       await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
+      await voting.changeMinOpenVoteAmount(bigExp(MIN_OPEN_VOTE_AMOUNT, 18), { from: root })
 
       executionTarget = await ExecutionTarget.new()
     })
@@ -128,8 +138,18 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
     it('can change required support', async () => {
       const receipt = await voting.changeSupportRequiredPct(neededSupport.add(toBn(1)))
       assertAmountOfEvents(receipt, 'ChangeSupportRequired')
-
       assert.equal((await voting.supportRequiredPct()).toString(), neededSupport.add(toBn(1)).toString(), 'should have changed required support')
+    })
+
+    it('can change minimum amount to open a vote', async () => {
+      const amount = bigExp(MIN_OPEN_VOTE_AMOUNT, 18).add(toBn(1))
+      const receipt = await voting.changeMinOpenVoteAmount(amount)
+      assertAmountOfEvents(receipt, 'ChangeMinOpenVoteAmount')
+      assert.equal((await voting.minOpenVoteAmount()).toString(), amount.toString(), 'should have changed minimum amount to open a vote')
+    })
+
+    it('fails changing minimum amount to open a vote', async () => {
+      await assertRevert(voting.changeMinOpenVoteAmount('1', { from: holder1 }), errors.APP_AUTH_FAILED)
     })
 
     it('fails changing required support lower than minimum acceptance quorum', async () => {
@@ -170,7 +190,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
 
   })
 
-  for (const decimals of [0, 2, 18, 26]) {
+  for (const decimals of [/*0, 2, 18, 26*/18]) {
     context(`normal token supply, ${decimals} decimals`, () => {
       const neededSupport = pct16(50)
       const minimumAcceptanceQuorum = pct16(20)
@@ -183,6 +203,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         await token.generateTokens(holder51, bigExp(51, decimals))
 
         await voting.initialize(token.address, neededSupport, minimumAcceptanceQuorum, durationBlocks, bufferBlocks, executionDelayBlocks)
+        await voting.changeMinOpenVoteAmount(bigExp(MIN_OPEN_VOTE_AMOUNT, 18), { from: root })
 
         executionTarget = await ExecutionTarget.new()
       })
@@ -220,6 +241,25 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         assert.isTrue(await voting.canPerform(holder1, ANY_ADDR, '0x', [holder1]))
       })
 
+      it('should not be able to open a vote because it doesn\'t own the amount needed neither has the permissions', async () => {
+        await assertRevert(
+          voting.newVote(EMPTY_SCRIPT, 'metadata', true, {
+            from: holder60
+          }),
+          errors.DANDELION_VOTING_CAN_NOT_OPEN_VOTE
+        )
+      })
+
+      it('should be able to open a vote since it owns the amount needed', async () => {
+        await token.generateTokens(holder60, bigExp(MIN_OPEN_VOTE_AMOUNT, 18))
+        assert.isFalse(await acl.hasPermission(holder60, voting.address, CREATE_VOTES_ROLE))
+        const voteId = createdVoteId(await voting.newVote(EMPTY_SCRIPT, 'metadata', true, {
+          from: holder60
+        }))
+        const { open } = await voting.getVote(voteId)
+        assert.isTrue(open)
+      })
+
       context('creating vote', () => {
         let script, voteId, creator, metadata
 
@@ -252,7 +292,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
           assert.equal(nay, 0, 'initial nay should be 0')
           assert.equal(execScript, script, 'script should be correct')
           assert.equal(metadata, 'metadata', 'should have returned correct metadata')
-          assert.equal(await voting.getVoterState(voteId, nonHolder), VOTER_STATE.ABSENT, 'nonHolder should not have voted')
+          assert.equal(await voting.getVoterState(voteId, holder60), VOTER_STATE.ABSENT, 'holder60 should not have voted')
         })
 
         it('fails getting a vote out of bounds', async () => {
@@ -328,7 +368,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         })
 
         it('uses current balance as vote weight when balance decreases after vote start', async () => {
-          await token.transfer(nonHolder, bigExp(1, decimals), { from: holder29 })
+          await token.transfer(holder60, bigExp(1, decimals), { from: holder29 })
 
           await voting.vote(voteId, true, { from: holder29 })
           const { yea } = await voting.getVote(voteId)
@@ -339,12 +379,12 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
         })
 
         it('throws when voter stake becomes 0 after vote start', async () => {
-          await token.transfer(nonHolder, bigExp(29, decimals), { from: holder29 })
+          await token.transfer(holder60, bigExp(29, decimals), { from: holder29 })
           await assertRevert(voting.vote(voteId, true, { from: holder29 }), errors.DANDELION_VOTING_CAN_NOT_VOTE)
         })
 
         it('throws when non-holder votes', async () => {
-          await assertRevert(voting.vote(voteId, true, { from: nonHolder }), errors.DANDELION_VOTING_CAN_NOT_VOTE)
+          await assertRevert(voting.vote(voteId, true, { from: holder60 }), errors.DANDELION_VOTING_CAN_NOT_VOTE)
         })
 
         it('throws when voting after voting closes', async () => {
@@ -626,6 +666,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
             async (sender) => await voting.onTransfer.call(sender, ANY_ADDR, bigExp(1, 18)))
         })
       })
+
       it('should be able to vote for a third party', async () => {
         const action = { to: executionTarget.address, calldata: executionTarget.contract.methods.execute().encodeABI() }
         const script = encodeCallScript([action])
@@ -812,10 +853,6 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, n
   })
 
   context('before init', () => {
-    it('fails creating a vote before initialization', async () => {
-      await assertRevert(voting.newVote(encodeCallScript([]), '', true), errors.APP_AUTH_FAILED)
-    })
-
     it('fails to forward actions before initialization', async () => {
       const action = { to: executionTarget.address, calldata: executionTarget.contract.methods.execute().encodeABI() }
       const script = encodeCallScript([action])

@@ -7,10 +7,9 @@ pragma solidity 0.4.24;
 import "@aragon/os/contracts/apps/AragonApp.sol";
 import "@aragon/os/contracts/common/IForwarder.sol";
 import "@aragon/os/contracts/acl/IACLOracle.sol";
-
+import "@aragon/os/contracts/lib/token/ERC20.sol";
 import "@aragon/os/contracts/lib/math/SafeMath.sol";
 import "@aragon/os/contracts/lib/math/SafeMath64.sol";
-
 import "@aragon/minime/contracts/MiniMeToken.sol";
 import "@1hive/apps-token-manager/contracts/TokenManagerHook.sol";
 import "./SigUtils.sol";
@@ -25,6 +24,7 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp,
     bytes32 public constant MODIFY_QUORUM_ROLE = keccak256("MODIFY_QUORUM_ROLE");
     bytes32 public constant MODIFY_BUFFER_BLOCKS_ROLE = keccak256("MODIFY_BUFFER_BLOCKS_ROLE");
     bytes32 public constant MODIFY_EXECUTION_DELAY_ROLE = keccak256("MODIFY_EXECUTION_DELAY_ROLE");
+    bytes32 public constant MODIFY_MIN_OPEN_VOTE_AMOUNT_ROLE = keccak256("MODIFY_MIN_OPEN_VOTE_AMOUNT_ROLE");
 
     uint64 public constant PCT_BASE = 10 ** 18; // 0% = 0; 1% = 10^16; 100% = 10^18
     uint8 private constant EXECUTION_PERIOD_FALLBACK_DIVISOR = 2;
@@ -42,6 +42,7 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp,
     string private constant ERROR_ORACLE_SENDER_MISSING = "DANDELION_VOTING_ORACLE_SENDER_MISSING";
     string private constant ERROR_ORACLE_SENDER_TOO_BIG = "DANDELION_VOTING_ORACLE_SENDER_TOO_BIG";
     string private constant ERROR_ORACLE_SENDER_ZERO = "DANDELION_VOTING_ORACLE_SENDER_ZERO";
+    string private constant ERROR_CAN_NOT_OPEN_VOTE = "DANDELION_VOTING_CAN_NOT_OPEN_VOTE";
 
     enum VoterState { Absent, Yea, Nay }
 
@@ -70,6 +71,9 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp,
     uint256 public votesLength;
     mapping (address => uint256) public latestYeaVoteId;
 
+    // v2.0.0
+    uint256 public minOpenVoteAmount;
+
     event StartVote(uint256 indexed voteId, address indexed creator, string metadata);
     event CastVote(uint256 indexed voteId, address indexed voter, bool supports, uint256 stake);
     event ExecuteVote(uint256 indexed voteId);
@@ -77,6 +81,7 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp,
     event ChangeMinQuorum(uint64 minAcceptQuorumPct);
     event ChangeBufferBlocks(uint64 bufferBlocks);
     event ChangeExecutionDelayBlocks(uint64 executionDelayBlocks);
+    event ChangeMinOpenVoteAmount(uint256 minOpenVoteAmount);
 
     modifier voteExists(uint256 _voteId) {
         require(_voteId != 0, ERROR_VOTE_ID_ZERO);
@@ -165,7 +170,16 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp,
     }
 
     /**
-    * @notice Create a new vote about "`_metadata`"
+    * @notice Change token minimum amount required to open a vote.
+    * @param _minOpenVoteAmount New minimum amount of token required to open a vote
+    */
+    function changeMinOpenVoteAmount(uint256 _minOpenVoteAmount) external auth(MODIFY_MIN_OPEN_VOTE_AMOUNT_ROLE) {
+        minOpenVoteAmount = _minOpenVoteAmount;
+        emit ChangeMinOpenVoteAmount(_minOpenVoteAmount);
+    }
+
+    /**
+    * @notice Create a new vote about "`_metadata`" if the msg.sender owns a certain amount of TOKEN
     * @param _executionScript EVM script to be executed on approval
     * @param _metadata Vote metadata
     * @param _castVote Whether to also cast newly created vote
@@ -173,10 +187,17 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp,
     */
     function newVote(bytes _executionScript, string _metadata, bool _castVote)
         external
-        auth(CREATE_VOTES_ROLE)
         returns (uint256 voteId)
     {
-        return _newVote(_executionScript, _metadata, _castVote);
+        if (ERC20(token).balanceOf(msg.sender) >= minOpenVoteAmount) {
+            return _newVote(_executionScript, _metadata, _castVote);
+        }
+
+        if (canPerform(msg.sender, CREATE_VOTES_ROLE, arr())) {
+            return _newVote(_executionScript, _metadata, _castVote);
+        }
+
+        revert(ERROR_CAN_NOT_OPEN_VOTE);
     }
 
     /**
