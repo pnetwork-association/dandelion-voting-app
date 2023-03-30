@@ -61,7 +61,8 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, h
     DANDELION_VOTING_ORACLE_SENDER_MISSING: 'DANDELION_VOTING_ORACLE_SENDER_MISSING',
     DANDELION_VOTING_ORACLE_SENDER_TOO_BIG: 'DANDELION_VOTING_ORACLE_SENDER_TOO_BIG',
     DANDELION_VOTING_ORACLE_SENDER_ZERO: 'DANDELION_VOTING_ORACLE_SENDER_ZERO',
-    DANDELION_VOTING_CAN_NOT_OPEN_VOTE: 'DANDELION_VOTING_CAN_NOT_OPEN_VOTE'
+    DANDELION_VOTING_CAN_NOT_OPEN_VOTE: 'DANDELION_VOTING_CAN_NOT_OPEN_VOTE',
+    DANDELION_VOTING_NOT_FORWARDER: 'DANDELION_VOTING_NOT_FORWARDER'
   })
 
   const duration = 60 * 60 * 24 * 3
@@ -604,7 +605,7 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, h
         const script = encodeCallScript([action])
         const voteId = createdVoteId(await voting.newVote(script, '', true, { from: root }))
 
-        // holder1 enables holder2 to vote for him
+        // holder1 enables holder20 to vote for him
         const signature = await enableVotingFor(holder29, holder1, voteId, true, voting.address)
         await voting.voteFor(voteId, true, signature, {
           from: holder1
@@ -643,6 +644,27 @@ contract('Voting App', ([root, holder1, holder2, holder20, holder29, holder51, h
             from: holder1
           }),
           errors.DANDELION_VOTING_CAN_NOT_VOTE
+        )
+      })
+
+      it('should be able to delegateVote using the forwarder', async () => {
+        const action = { to: executionTarget.address, calldata: executionTarget.contract.methods.execute().encodeABI() }
+        const script = encodeCallScript([action])
+        const voteId = createdVoteId(await voting.newVote(script, '', true, { from: root }))
+        await voting.delegateVote(holder29, voteId, true, { from: forwarder })
+        await voting.mockIncreaseTime(duration + executionDelay)
+        await voting.executeVote(voteId)
+      })
+
+      it('should revert if someone try to delegateVote without be the forwarder', async () => {
+        const action = { to: executionTarget.address, calldata: executionTarget.contract.methods.execute().encodeABI() }
+        const script = encodeCallScript([action])
+        const voteId = createdVoteId(await voting.newVote(script, '', true, { from: root }))
+        await assertRevert(
+          voting.delegateVote(holder60, voteId, true, {
+            from: holder60
+          }),
+          errors.DANDELION_VOTING_NOT_FORWARDER
         )
       })
     })
