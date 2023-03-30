@@ -426,7 +426,7 @@ contract DandelionVoting is IForwarder, IACLOracle, TokenManagerHook, AragonApp,
         Vote storage vote_ = votes[voteId];
         vote_.startDate = startDate;
         vote_.executionDate = executionDate;
-        vote_.snapshotBlock = getBlockNumber64() - 1; // startBlock - 1; avoid double voting in this very block
+        vote_.snapshotBlock = getBlockNumber64() - 1; // avoid double voting in this very block
         vote_.supportRequiredPct = supportRequiredPct;
         vote_.minAcceptQuorumPct = minAcceptQuorumPct;
         vote_.executionScript = _executionScript;
