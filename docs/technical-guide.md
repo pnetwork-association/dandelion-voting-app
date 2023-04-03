@@ -48,6 +48,7 @@ bytes32 public constant CREATE_VOTES_ROLE = keccak256("CREATE_VOTES_ROLE");
 bytes32 public constant MODIFY_SUPPORT_ROLE = keccak256("MODIFY_SUPPORT_ROLE");
 bytes32 public constant MODIFY_QUORUM_ROLE = keccak256("MODIFY_QUORUM_ROLE");
 bytes32 public constant MODIFY_EXECUTION_DELAY_ROLE = keccak256("MODIFY_EXECUTION_DELAY_ROLE");
+bytes32 public constant MODIFY_FORWARDER_ROLE = keccak256("MODIFY_FORWARDER_ROLE");
 ```
 
 These roles can be set to another Aragon app or an individual address.
@@ -123,6 +124,8 @@ event ChangeSupportRequired(uint64 supportRequiredPct);
 event ChangeMinQuorum(uint64 minAcceptQuorumPct);
 // Execution delay duration has been changed
 event ChangeExecutionDelay(uint64 executionDelay);
+// Forwarder contract has been changed
+event ChangeForwarder(address forwarder);
 ```
 
 <br />
@@ -159,7 +162,8 @@ The Dandelion Voting app is initialized with the `_token`, `_supportRequiredPct`
       uint64 _supportRequiredPct,
       uint64 _minAcceptQuorumPct,
       uint64 _duration,
-      uint64 _executionDelay
+      uint64 _executionDelay,
+      address _forwarder
   )
       external
       onlyInit
@@ -175,6 +179,7 @@ The Dandelion Voting app is initialized with the `_token`, `_supportRequiredPct`
       duration = _duration;
       bufferBlocks = _bufferBlocks;
       executionDelay = _executionDelay;
+      forwarder = _forwarder;
   }
 ```
 

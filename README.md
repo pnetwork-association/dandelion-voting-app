@@ -63,6 +63,7 @@ The Dandelion Voting app is initialized with a `MiniMeToken _token`, `uint64 _su
 - `uint64 _minAcceptQuorumPct` refers to the quorum required to pass a vote
 - `uint64 _duration` refers to the number of seconds that a vote stays open
 - `uint64 _executionDelay` refers to the number of seconds that a vote will be delayed from when is closed to when it actually can be executed (in case it passes).
+- `address _forwarder_` forwarder contract that allows to voting crosschain.
 
 ## Roles
 
@@ -72,6 +73,7 @@ The Dandelion Voting app should implement the following roles:
 - **MODIFY_SUPPORT_ROLE**: This allows for changing the amount of support required to pass a vote
 - **MODIFY_QUORUM_ROLE**: This allows for changing the quorum required to pass votes
 - **MODIFY_EXECUTION_DELAY_ROLE**; This allows for changing the number of seconds that votes are delayed from when they are closed till when they can be executed (in case they pass).
+- **MODIFY_FORWARDER_ROLE**; This allows for changing the forwarder contract.
 
 ### Interface
 
@@ -115,7 +117,7 @@ The Dandelion voting app has been published to APM on Mainnet and Rinkeby at `da
 To deploy to an organization you can use the [aragonCLI](https://hack.aragon.org/docs/cli-intro.html).
 
 ```sh
-aragon dao install <dao-address> dandelion-voting.aragonpm.eth --app-init-args <token-address> <supportRequiredPct> <minAcceptQuorumPct> <durationBlocks> <bufferBlocks> <executionDelayBlocks>
+aragon dao install <dao-address> dandelion-voting.aragonpm.eth --app-init-args <token-address> <supportRequiredPct> <minAcceptQuorumPct> <durationBlocks> <bufferBlocks> <executionDelayBlocks> <forwarder>
 ```
 
 ## Contributing
