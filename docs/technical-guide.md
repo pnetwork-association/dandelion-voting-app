@@ -220,15 +220,6 @@ function changeMinAcceptQuorumPct(uint64 _minAcceptQuorumPct)
 }
 
 /**
-* @notice Change vote buffer to `_voteBufferBlocks` seconds
-* @param _bufferBlocks New vote buffer defined in seconds
-*/
-function changeBuffer(uint64 _bufferBlocks) external auth(MODIFY_BUFFER_ROLE) {
-    bufferBlocks = _bufferBlocks;
-    emit ChangeBuffer(_bufferBlocks);
-}
-
-/**
 * @notice Change execution delay to `_executionDelay` seconds
 * @param _executionDelay New vote execution delay defined in seconds
 */

@@ -48,11 +48,6 @@
       "params": ["New quorum", "Current quorum"]
     },
     {
-      "name": "Modify buffer blocks",
-      "id": "MODIFY_BUFFER_ROLE",
-      "params": []
-    },
-    {
       "name": "Modify execution delay blocks",
       "id": "MODIFY_EXECUTION_DELAY_ROLE",
       "params": []
