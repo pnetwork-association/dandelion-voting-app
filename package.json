@@ -1,13 +1,12 @@
 {
   "name": "pnetwork-voting-app",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "scripts": {
     "postinstall": "npx patch-package && npm run compile",
     "start": "buidler start",
     "console": "buidler console",
     "compile": "buidler compile --force",
     "devchain": "buidler node",
-    "build": "cd app && npm run build",
     "lint": "buidler check && echo 'Lint complete.'",
     "test": "buidler test --network buidlerevm",
     "test:gas": "GAS_REPORTER=true npm run test",
