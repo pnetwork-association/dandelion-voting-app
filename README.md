@@ -21,10 +21,10 @@ It serves the same purpose as the original Voting app but also enables organizat
 The main changes that have been implemented which differ from the original Voting app are:
 
 - Removed the ability for a user to change their vote.
-- Added a buffer period which determines how much time in blocks must pass between the start of each vote.
-- Added an execution delay period in blocks (this means that the `full vote duration` + `full execution delay period` must pass before being able to execute a vote in case it passes).
+- Added a buffer period which determines how much time in seconds must pass between the start of each vote.
+- Added an execution delay period in seconds (this means that the `full vote duration` + `full execution delay period` must pass before being able to execute a vote in case it passes).
 - Removed the early execution functionality.
-- Changed the vote duration to blocks. The main reason for this is that since proposals are queued we do not necessarily know which block number to use for the vote snapshot (since we are not necessarily processing the transaction right when the vote starts).
+- Changed the vote duration to seconds. The main reason for this is that since proposals are queued we do not necessarily know which block number to use for the vote snapshot (since we are not necessarily processing the transaction right when the vote starts).
 - Keep track of the latest vote ids users have voted yes on.
 - Make the app an [ACL Oracle](https://hack.aragon.org/docs/acl_IACLOracle).
 
@@ -33,7 +33,7 @@ The main changes that have been implemented which differ from the original Votin
 
 It has the same funcionality as the regular voting app with some exceptions:
 
-- Proposals are now queued with a minimum number of blocks between the start of each one.
+- Proposals are now queued with a minimum number of seconds between the start of each one.
 - Users cannot change their decision after they have already voted.
 - Votes are delayed a configurable period of time since when they are closed till when they can be executed (in the case they pass).
 - Votes cannot be early executed. This means that the `full vote duration` + the `full delay period` has to pass in order to be able to execute a vote (in case it passes).
@@ -56,14 +56,13 @@ The fallback period is intended to ensure users are both locked in for votes the
 
 ## Initialization
 
-The Dandelion Voting app is initialized with a `MiniMeToken _token`, `uint64 _supportRequiredPct`, `uint64 _minAcceptQuorumPct`, `uint64 _durationBlocks`, `uint64 _bufferBlocks` and `uint64 _executionDelayBlocks`.
+The Dandelion Voting app is initialized with a `MiniMeToken _token`, `uint64 _supportRequiredPct`, `uint64 _minAcceptQuorumPct`, `uint64 _duration` and `uint64 _executionDelay`.
 
 - `MiniMeToken _token` refers to the token that will be used to vote
 - `uint64 _supportRequiredPct` refers to the support required to pass a vote
 - `uint64 _minAcceptQuorumPct` refers to the quorum required to pass a vote
-- `uint64 _durationBlocks` refers to the number of blocks that a vote stays open
-- `uint64 _bufferBlocks` refers to the minimum number of blocks between the start block of each vote
-- `uint64 _executionDelayBlocks` refers to the number of blocks that a vote will be delayed from when is closed to when it actually can be executed (in case it passes).
+- `uint64 _duration` refers to the number of seconds that a vote stays open
+- `uint64 _executionDelay` refers to the number of seconds that a vote will be delayed from when is closed to when it actually can be executed (in case it passes).
 
 ## Roles
 
@@ -72,8 +71,7 @@ The Dandelion Voting app should implement the following roles:
 - **CREATE_VOTES_ROLE**: This allows for changing the Aragon app that can create votes
 - **MODIFY_SUPPORT_ROLE**: This allows for changing the amount of support required to pass a vote
 - **MODIFY_QUORUM_ROLE**: This allows for changing the quorum required to pass votes
-- **MODIFY_BUFFER_BLOCKS_ROLE**: This allows for changing the minimum number of blocks between the start block of each vote
-- **MODIFY_EXECUTION_DELAY_ROLE**; This allows for changing the number of blocks that votes are delayed from when they are closed till when they can be executed (in case they pass).
+- **MODIFY_EXECUTION_DELAY_ROLE**; This allows for changing the number of seconds that votes are delayed from when they are closed till when they can be executed (in case they pass).
 
 ### Interface
 

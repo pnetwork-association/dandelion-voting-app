@@ -8,10 +8,10 @@ It serves the same purpose as the original Voting app but also enables organizat
 The main changes that have been implemented which differ from the original Voting app are:
 
 - Removed the ability for a user to change their vote.
-- Added a buffer period which determines how much time in blocks must pass between the start of each vote.
-- Added an execution delay period in blocks (this means that the `full vote duration` + `full execution delay period` must pass before being able to execute a vote in case it passes).
+- Added a buffer period which determines how much time in seconds must pass between the start of each vote.
+- Added an execution delay period in seconds (this means that the `full vote duration` + `full execution delay period` must pass before being able to execute a vote in case it passes).
 - Removed the early execution functionality.
-- Changed the vote duration to blocks. The main reason for this is that since proposals are queued we do not necessarily know which block number to use for the vote snapshot (since we are not necessarily processing the transaction right when the vote starts).
+- Changed the vote duration to seconds. The main reason for this is that since proposals are queued we do not necessarily know which block number to use for the vote snapshot (since we are not necessarily processing the transaction right when the vote starts).
 - Keep track of the latest vote ids users have voted yes on.
 - Make the app an [ACL Oracle](https://hack.aragon.org/docs/acl_IACLOracle).
 
@@ -47,7 +47,6 @@ The Dandelion Voting app has the following roles:
 bytes32 public constant CREATE_VOTES_ROLE = keccak256("CREATE_VOTES_ROLE");
 bytes32 public constant MODIFY_SUPPORT_ROLE = keccak256("MODIFY_SUPPORT_ROLE");
 bytes32 public constant MODIFY_QUORUM_ROLE = keccak256("MODIFY_QUORUM_ROLE");
-bytes32 public constant MODIFY_BUFFER_BLOCKS_ROLE = keccak256("MODIFY_BUFFER_BLOCKS_ROLE");
 bytes32 public constant MODIFY_EXECUTION_DELAY_ROLE = keccak256("MODIFY_EXECUTION_DELAY_ROLE");
 ```
 
@@ -66,8 +65,8 @@ enum VoterState { Absent, Yea, Nay }
 // Vote structure
 struct Vote {
     bool executed;
-    uint64 startBlock;
-    uint64 executionBlock;
+    uint64 startDate;
+    uint64 executionDate;
     uint64 snapshotBlock;
     uint64 supportRequiredPct;
     uint64 minAcceptQuorumPct;
@@ -86,14 +85,11 @@ uint64 public supportRequiredPct;
 // Minimum % of quorum required for votes to pass
 uint64 public minAcceptQuorumPct;
 
-// Vote duration in blocks (determines how long from the start of a vote till it ends)
-uint64 public durationBlocks;
+// Vote duration in seconds (determines how long from the start of a vote till it ends)
+uint64 public duration;
 
-// Vote buffer in blocks (determines how much time in blocks must pass between the start of each vote)
-uint64 public bufferBlocks;
-
-// Vote execution delay in blocks (determines how much time in blocks must pass from when a vote is passed till it can be executed)
-uint64 public executionDelayBlocks;
+// Vote execution delay in seconds (determines how much time in seconds must pass from when a vote is passed till it can be executed)
+uint64 public executionDelay;
 
 // Mapping that keeps track of votes
 mapping (uint256 => Vote) internal votes;
@@ -125,10 +121,8 @@ event ExecuteVote(uint256 indexed voteId);
 event ChangeSupportRequired(uint64 supportRequiredPct);
 // Minimum Quorum required has been changed
 event ChangeMinQuorum(uint64 minAcceptQuorumPct);
-// Buffer duration has been changed
-event ChangeBufferBlocks(uint64 bufferBlocks);
 // Execution delay duration has been changed
-event ChangeExecutionDelayBlocks(uint64 executionDelayBlocks);
+event ChangeExecutionDelay(uint64 executionDelay);
 ```
 
 <br />
@@ -149,25 +143,23 @@ modifier voteExists(uint256 _voteId) {
 
 ## Initialization
 
-The Dandelion Voting app is initialized with the `_token`, `_supportRequiredPct`, `_minAcceptQuorumPct`, `_durationBlocks`, `_bufferBlocks` and `_executionDelayBlocks` parameters.
+The Dandelion Voting app is initialized with the `_token`, `_supportRequiredPct`, `_minAcceptQuorumPct`, `_duration`, `_bufferBlocks` and `_executionDelay` parameters.
 
 ```
  /**
-  * @notice Initialize Voting app with `_token.symbol(): string` for governance, minimum support of `@formatPct(_supportRequiredPct)`%, minimum acceptance quorum of `@formatPct(_minAcceptQuorumPct)`%, a voting duration of `_voteDurationBlocks` blocks, and a vote buffer of `_voteBufferBlocks` blocks
+  * @notice Initialize Voting app with `_token.symbol(): string` for governance, minimum support of `@formatPct(_supportRequiredPct)`%, minimum acceptance quorum of `@formatPct(_minAcceptQuorumPct)`%, a voting duration of `_voteDurationBlocks` seconds, and a vote buffer of `_voteBufferBlocks` seconds
   * @param _token MiniMeToken Address that will be used as governance token
   * @param _supportRequiredPct Percentage of yeas in casted votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
   * @param _minAcceptQuorumPct Percentage of yeas in total possible votes for a vote to succeed (expressed as a percentage of 10^18; eg. 10^16 = 1%, 10^18 = 100%)
-  * @param _durationBlocks Blocks that a vote will be open for token holders to vote
-  * @param _bufferBlocks Minimum number of blocks between the start block of each vote
-  * @param _executionDelayBlocks Minimum number of blocks between the end of a vote and when it can be executed
+  * @param _duration Blocks that a vote will be open for token holders to vote
+  * @param _executionDelay Minimum number of seconds between the end of a vote and when it can be executed
   */
   function initialize(
       MiniMeToken _token,
       uint64 _supportRequiredPct,
       uint64 _minAcceptQuorumPct,
-      uint64 _durationBlocks,
-      uint64 _bufferBlocks,
-      uint64 _executionDelayBlocks
+      uint64 _duration,
+      uint64 _executionDelay
   )
       external
       onlyInit
@@ -180,9 +172,9 @@ The Dandelion Voting app is initialized with the `_token`, `_supportRequiredPct`
       token = _token;
       supportRequiredPct = _supportRequiredPct;
       minAcceptQuorumPct = _minAcceptQuorumPct;
-      durationBlocks = _durationBlocks;
+      duration = _duration;
       bufferBlocks = _bufferBlocks;
-      executionDelayBlocks = _executionDelayBlocks;
+      executionDelay = _executionDelay;
   }
 ```
 
@@ -223,21 +215,21 @@ function changeMinAcceptQuorumPct(uint64 _minAcceptQuorumPct)
 }
 
 /**
-* @notice Change vote buffer to `_voteBufferBlocks` blocks
-* @param _bufferBlocks New vote buffer defined in blocks
+* @notice Change vote buffer to `_voteBufferBlocks` seconds
+* @param _bufferBlocks New vote buffer defined in seconds
 */
-function changeBufferBlocks(uint64 _bufferBlocks) external auth(MODIFY_BUFFER_BLOCKS_ROLE) {
+function changeBuffer(uint64 _bufferBlocks) external auth(MODIFY_BUFFER_ROLE) {
     bufferBlocks = _bufferBlocks;
-    emit ChangeBufferBlocks(_bufferBlocks);
+    emit ChangeBuffer(_bufferBlocks);
 }
 
 /**
-* @notice Change execution delay to `_executionDelayBlocks` blocks
-* @param _executionDelayBlocks New vote execution delay defined in blocks
+* @notice Change execution delay to `_executionDelay` seconds
+* @param _executionDelay New vote execution delay defined in seconds
 */
-function changeExecutionDelayBlocks(uint64 _executionDelayBlocks) external auth(MODIFY_EXECUTION_DELAY_ROLE) {
-    executionDelayBlocks = _executionDelayBlocks;
-    emit ChangeExecutionDelayBlocks(_executionDelayBlocks);
+function changeExecutionDelay(uint64 _executionDelay) external auth(MODIFY_EXECUTION_DELAY_ROLE) {
+    executionDelay = _executionDelay;
+    emit ChangeExecutionDelay(_executionDelay);
 }
 ```
 
@@ -274,19 +266,19 @@ Internal function that creates the votes:
       voteId = ++votesLength; // Increment votesLength before assigning to votedId. The first voteId is 1.
 
       // Get the start block of the previous vote (if it's the first vote will be 0)
-      uint64 previousVoteStartBlock = votes[voteId - 1].startBlock;
-      // Here we ensure that the next vote created starts at least `bufferBlocks` blocks after the previous vote start block
+      uint64 previousVoteStartBlock = votes[voteId - 1].startDate;
+      // Here we ensure that the next vote created starts at least `bufferBlocks` seconds after the previous vote start block
       uint64 earliestStartBlock = previousVoteStartBlock == 0 ? 0 : previousVoteStartBlock.add(bufferBlocks);
       // Get the actual start block of the next vote created (if the bufferBlocks duration has already passes then get the current block number)
-      uint64 startBlock = earliestStartBlock < getBlockNumber64() ? getBlockNumber64() : earliestStartBlock;
+      uint64 startDate = earliestStartBlock < getBlockNumber64() ? getBlockNumber64() : earliestStartBlock;
 
       // Get the block from where the vote will be able to be executed in case it passes
-      uint64 executionBlock = startBlock.add(durationBlocks).add(executionDelayBlocks);
+      uint64 executionDate = startDate.add(duration).add(executionDelay);
 
       Vote storage vote_ = votes[voteId];
-      vote_.startBlock = startBlock;
-      vote_.executionBlock = executionBlock;
-      vote_.snapshotBlock = startBlock - 1; // avoid double voting in this very block
+      vote_.startDate = startDate;
+      vote_.executionDate = executionDate;
+      vote_.snapshotBlock = startDate - 1; // avoid double voting in this very block
       vote_.supportRequiredPct = supportRequiredPct;
       vote_.minAcceptQuorumPct = minAcceptQuorumPct;
       vote_.executionScript = _executionScript;
@@ -427,11 +419,11 @@ function canPerform(address, address, bytes32, uint256[] _how) external view ret
     // get if the latest vote the sender voted yea on failed
     bool senderLatestYeaVoteFailed = !_votePassed(senderLatestYeaVote_);
     // get if the latest vote the sender voted yea on has already passed it's execution delay period
-    bool senderLatestYeaVoteExecutionBlockPassed = blockNumber >= senderLatestYeaVote_.executionBlock;
+    bool senderLatestYeaVoteExecutionBlockPassed = blockNumber >= senderLatestYeaVote_.executionDate;
 
     // get fallback period duration
     uint64 fallbackPeriodLength = bufferBlocks / EXECUTION_PERIOD_FALLBACK_DIVISOR;
-    bool senderLatestYeaVoteFallbackPeriodPassed = blockNumber > senderLatestYeaVote_.executionBlock.add(fallbackPeriodLength);
+    bool senderLatestYeaVoteFallbackPeriodPassed = blockNumber > senderLatestYeaVote_.executionDate.add(fallbackPeriodLength);
 
     // tell wether sender can perform action or not based on the conditions listed above
     return senderLatestYeaVoteFailed && senderLatestYeaVoteExecutionBlockPassed || senderLatestYeaVote_.executed || senderLatestYeaVoteFallbackPeriodPassed;
@@ -474,7 +466,7 @@ Internal function that checks if a vote can be executed or not:
       }
 
       // This will always be later than the end of the previous vote
-      if (getBlockNumber64() < vote_.executionBlock) {
+      if (getBlockNumber64() < vote_.executionDate) {
           return false;
       }
 
@@ -550,8 +542,8 @@ In the case that it has not passed yet, the `voting power` will be the `total su
       returns (
           bool open,
           bool executed,
-          uint64 startBlock,
-          uint64 executionBlock,
+          uint64 startDate,
+          uint64 executionDate,
           uint64 snapshotBlock,
           uint64 supportRequired,
           uint64 minAcceptQuorum,
@@ -565,8 +557,8 @@ In the case that it has not passed yet, the `voting power` will be the `total su
 
       open = _isVoteOpen(vote_);
       executed = vote_.executed;
-      startBlock = vote_.startBlock;
-      executionBlock = vote_.executionBlock;
+      startDate = vote_.startDate;
+      executionDate = vote_.executionDate;
       snapshotBlock = vote_.snapshotBlock;
       votingPower = token.totalSupplyAt(vote_.snapshotBlock);
       supportRequired = vote_.supportRequiredPct;
@@ -645,7 +637,7 @@ Tells wether a vote is open or not
   function _isVoteOpen(Vote storage vote_) internal view returns (bool) {
       uint256 votingPowerAtSnapshot = token.totalSupplyAt(vote_.snapshotBlock);
       uint64 blockNumber = getBlockNumber64();
-      return votingPowerAtSnapshot > 0 && blockNumber >= vote_.startBlock && blockNumber < vote_.startBlock.add(durationBlocks);
+      return votingPowerAtSnapshot > 0 && blockNumber >= vote_.startDate && blockNumber < vote_.startDate.add(duration);
   }
 ```
 
