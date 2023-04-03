@@ -24,8 +24,13 @@
       "registry": "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e",
       "appName": "pnetwork-voting.open.aragonpm.eth",
       "network": "mainnet"
+    },
+    "matic": {
+      "registry": "0x71ca3721bc5bb38f42e066d378a91983448de356",
+      "appName": "pnetwork-voting.open.aragonpm.eth",
+      "network": "matic"
     }
-  },
+  }, 
   "roles": [
     {
       "name": "Create new votes",
@@ -44,7 +49,7 @@
     },
     {
       "name": "Modify buffer blocks",
-      "id": "MODIFY_BUFFER_BLOCKS_ROLE",
+      "id": "MODIFY_BUFFER_ROLE",
       "params": []
     },
     {
@@ -55,6 +60,11 @@
     {
       "name": "Modify minimum amount to open a vote",
       "id": "MODIFY_MIN_OPEN_VOTE_AMOUNT_ROLE",
+      "params": []
+    },
+    {
+      "name": "Modify the forwarder role",
+      "id": "MODIFY_FORWARDER_ROLE",
       "params": []
     }
   ]
